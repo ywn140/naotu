@@ -1,0 +1,12 @@
+<view class="container">
+  <view class="input-section">
+    <textarea class="text-input" placeholder="请输入或粘贴文本内容" bindinput="onTextInput" value="{{inputText}}"></textarea>
+    <view class="divider">或</view>
+    <input class="link-input" placeholder="请输入文本链接" bindinput="onLinkInput" value="{{inputLink}}"/>
+  </view>
+  
+  <view class="button-group">
+    <button class="generate-btn" type="primary" bindtap="generateMindmap">生成脑图</button>
+    <button class="clear-btn" bindtap="clearInput">清空输入</button>
+  </view>
+</view>
