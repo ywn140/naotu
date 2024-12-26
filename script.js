@@ -2,455 +2,357 @@ class MindMap {
     constructor() {
         this.graph = null;
         this.data = null;
-        this.loading = document.querySelector('.loading');
-        this.errorMessage = document.querySelector('.error-message');
-        this.historyList = document.querySelector('#history-list');
-        this.currentTheme = localStorage.getItem('theme') || 'light';
+        this.isDarkTheme = localStorage.getItem('theme') === 'dark';
         this.init();
-        this.loadTheme();
+        this.bindEvents();
     }
 
     init() {
-        this.bindEvents();
-        this.loadHistory();
+        // 设置主题
+        document.body.setAttribute('data-theme', this.isDarkTheme ? 'dark' : 'light');
+
+        // 初始化图形实例
+        this.graph = new G6.Graph({
+            container: 'mindmap',
+            width: document.getElementById('mindmap').offsetWidth,
+            height: document.getElementById('mindmap').offsetHeight,
+            modes: {
+                default: ['drag-canvas', 'zoom-canvas'],
+            },
+            defaultNode: {
+                type: 'rect',
+                style: {
+                    radius: 5,
+                },
+            },
+            defaultEdge: {
+                type: 'cubic-horizontal',
+                style: {
+                    stroke: '#A3B1BF',
+                },
+            },
+            layout: {
+                type: 'mindmap',
+                direction: 'H',
+                getHeight: () => 16,
+                getWidth: () => 16,
+                getVGap: () => 10,
+                getHGap: () => 50,
+                getSide: (d) => {
+                    if (d.id === 'root') return 'right';
+                    return d.data.side || 'right';
+                },
+            },
+            animate: true,
+        });
+
+        // 监听窗口大小变化
+        window.addEventListener('resize', () => {
+            if (this.graph) {
+                this.graph.changeSize(
+                    document.getElementById('mindmap').offsetWidth,
+                    document.getElementById('mindmap').offsetHeight
+                );
+            }
+        });
     }
 
     bindEvents() {
-        // 生成按钮事件
-        const generateBtn = document.getElementById('generate-btn');
-        if (generateBtn) {
-            generateBtn.addEventListener('click', () => this.generateMindMap());
-        }
+        // 生成按钮点击事件
+        document.getElementById('generate-btn').addEventListener('click', () => {
+            this.generateMindMap();
+        });
 
-        // 主题切换事件
-        const themeToggle = document.getElementById('theme-toggle');
-        if (themeToggle) {
-            themeToggle.addEventListener('click', () => this.toggleTheme());
-        }
+        // 主题切换按钮点击事件
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            this.toggleTheme();
+        });
 
-        // 保存按钮事件
-        const saveBtn = document.getElementById('save-btn');
-        if (saveBtn) {
-            saveBtn.addEventListener('click', () => this.saveMindMap());
-        }
+        // 保存按钮点击事件
+        document.getElementById('save-btn').addEventListener('click', () => {
+            this.saveMindMap();
+        });
 
-        // 导出按钮事件
-        const exportBtn = document.getElementById('export-btn');
-        if (exportBtn) {
-            exportBtn.addEventListener('click', () => this.exportImage());
-        }
+        // 导出按钮点击事件
+        document.getElementById('export-btn').addEventListener('click', () => {
+            this.exportImage();
+        });
 
-        // 历史记录按钮事件
-        const historyBtn = document.getElementById('history-btn');
-        if (historyBtn) {
-            historyBtn.addEventListener('click', () => this.toggleHistory());
-        }
+        // 历史记录按钮点击事件
+        document.getElementById('history-btn').addEventListener('click', () => {
+            this.toggleHistory();
+        });
 
-        // 输入框事件
-        const textInput = document.getElementById('text-input');
-        if (textInput) {
-            textInput.addEventListener('input', () => {
-                if (generateBtn) {
-                    generateBtn.disabled = !textInput.value.trim();
-                }
-            });
-        }
+        // 文本框回车事件
+        document.getElementById('text-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                e.preventDefault();
+                this.generateMindMap();
+            }
+        });
     }
 
     showLoading() {
-        if (this.loading) {
-            this.loading.style.display = 'block';
-        }
+        document.querySelector('.loading').style.display = 'block';
     }
 
     hideLoading() {
-        if (this.loading) {
-            this.loading.style.display = 'none';
-        }
+        document.querySelector('.loading').style.display = 'none';
     }
 
     showError(message) {
-        if (this.errorMessage) {
-            this.errorMessage.textContent = message;
-            this.errorMessage.style.display = 'block';
-            setTimeout(() => {
-                this.errorMessage.style.display = 'none';
-            }, 3000);
-        }
+        const errorElement = document.querySelector('.error-message');
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+        setTimeout(() => {
+            errorElement.style.display = 'none';
+        }, 3000);
     }
 
     async generateMindMap() {
-        const textInput = document.getElementById('text-input');
-        if (!textInput) return;
-
-        const inputText = textInput.value.trim();
-        if (!inputText) {
+        const input = document.getElementById('text-input').value.trim();
+        if (!input) {
             this.showError('请输入要分析的文本内容');
             return;
         }
 
+        this.showLoading();
+
         try {
-            this.showLoading();
-            const data = this.parseText(inputText);
-            
-            if (!data || !data.nodes || data.nodes.length === 0) {
-                throw new Error('无法解析文本内容，请尝试输入更多信息');
-            }
+            // 这里是示例数据结构，实际项目中需要替换为真实的后端API调用
+            this.data = {
+                id: 'root',
+                label: input.split('\n')[0] || '中心主题',
+                children: this.parseText(input)
+            };
 
-            this.data = data;
-            
-            if (this.graph) {
-                this.graph.destroy();
-            }
-
-            this.initGraph();
-            this.graph.data(this.data);
-            this.graph.render();
-            this.graph.fitView();
-
+            this.renderMindMap();
         } catch (error) {
-            console.error('生成思维导图时出错:', error);
-            this.showError(error.message || '生成思维导图时出错，请重试');
+            this.showError('生成思维导图时发生错误');
+            console.error('Error generating mind map:', error);
         } finally {
             this.hideLoading();
         }
     }
 
-    // 主题切换相关方法
-    loadTheme() {
-        document.documentElement.setAttribute('data-theme', this.currentTheme);
+    parseText(text) {
+        // 简单的文本解析逻辑，可以根据需要扩展
+        const lines = text.split('\n').filter(line => line.trim());
+        if (lines.length <= 1) return [];
+
+        const children = [];
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line) {
+                children.push({
+                    id: `node-${i}`,
+                    label: line,
+                    style: {
+                        fill: this.getRandomColor(),
+                    },
+                });
+            }
+        }
+        return children;
+    }
+
+    getRandomColor() {
+        const colors = this.isDarkTheme ? 
+            ['#1f1f1f', '#2d2d2d', '#3d3d3d', '#4d4d4d'] : 
+            ['#E8F3FF', '#F7E8FF', '#FFE8E8', '#E8FFEA'];
+        return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    renderMindMap() {
+        if (!this.data || !this.graph) return;
+
+        const nodes = [];
+        const edges = [];
+
+        // 添加根节点
+        nodes.push({
+            id: this.data.id,
+            label: this.data.label,
+            style: {
+                fill: this.isDarkTheme ? '#177ddc' : '#91D5FF',
+                stroke: this.isDarkTheme ? '#177ddc' : '#91D5FF',
+                textBaseline: 'top',
+                textAlign: 'center',
+                radius: 4,
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: 'pointer',
+                lineWidth: 1,
+                opacity: 1
+            },
+            labelCfg: {
+                style: {
+                    fill: this.isDarkTheme ? '#ffffff' : '#000000',
+                    fontSize: 14,
+                    fontWeight: 500
+                }
+            }
+        });
+
+        // 添加子节点和边
+        this.data.children.forEach((child) => {
+            nodes.push({
+                id: child.id,
+                label: child.label,
+                style: {
+                    ...child.style,
+                    stroke: this.isDarkTheme ? '#434343' : '#e8e8e8',
+                    textBaseline: 'top',
+                    textAlign: 'center',
+                    radius: 4,
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    lineWidth: 1,
+                    opacity: 1
+                },
+                labelCfg: {
+                    style: {
+                        fill: this.isDarkTheme ? '#ffffff' : '#000000',
+                        fontSize: 12
+                    }
+                }
+            });
+
+            edges.push({
+                source: this.data.id,
+                target: child.id,
+                style: {
+                    stroke: this.isDarkTheme ? '#434343' : '#A3B1BF',
+                    lineWidth: 1,
+                    endArrow: false,
+                    cursor: 'pointer'
+                }
+            });
+        });
+
+        // 更新图形
+        this.graph.data({
+            nodes,
+            edges
+        });
+        this.graph.render();
+        this.graph.fitView();
     }
 
     toggleTheme() {
-        this.currentTheme = this.currentTheme === 'light' ? 'dark' : 'light';
-        localStorage.setItem('theme', this.currentTheme);
-        this.loadTheme();
+        this.isDarkTheme = !this.isDarkTheme;
+        document.body.setAttribute('data-theme', this.isDarkTheme ? 'dark' : 'light');
+        localStorage.setItem('theme', this.isDarkTheme ? 'dark' : 'light');
+
+        // 更新图标
+        const themeIcon = document.querySelector('#theme-toggle i');
+        themeIcon.className = this.isDarkTheme ? 'fas fa-sun' : 'fas fa-moon';
+
+        // 重新渲染思维导图
+        if (this.data) {
+            this.renderMindMap();
+        }
     }
 
-    // 保存思维导图
     saveMindMap() {
-        const textInput = document.getElementById('text-input');
-        if (!textInput || !this.data) {
+        const input = document.getElementById('text-input').value.trim();
+        if (!input || !this.data) {
             this.showError('没有可保存的思维导图');
             return;
         }
 
-        const inputText = textInput.value.trim();
-        if (!inputText) {
-            this.showError('没有可保存的内容');
-            return;
-        }
-
         try {
+            // 获取现有历史记录
             const history = JSON.parse(localStorage.getItem('mindmap_history') || '[]');
-            const newItem = {
+
+            // 创建新的记录
+            const newEntry = {
                 id: Date.now(),
-                text: inputText,
+                title: this.data.label,
+                text: input,
                 data: this.data,
-                date: new Date().toLocaleString()
+                timestamp: new Date().toISOString()
             };
 
-            history.unshift(newItem);
-            if (history.length > 10) history.pop(); // 最多保存10条记录
+            // 将新记录添加到历史记录开头
+            history.unshift(newEntry);
 
-            localStorage.setItem('mindmap_history', JSON.stringify(history));
-            this.showError('保存成功');
-            this.loadHistory();
+            // 只保留最新的10条记录
+            const updatedHistory = history.slice(0, 10);
+
+            // 保存更新后的历史记录
+            localStorage.setItem('mindmap_history', JSON.stringify(updatedHistory));
+
+            // 显示成功消息
+            this.showError('思维导图已保存');
         } catch (error) {
-            console.error('保存失败:', error);
-            this.showError('保存失败，请重试');
+            this.showError('保存失败');
+            console.error('Error saving mind map:', error);
         }
     }
 
-    // 加载历史记录
-    loadHistory() {
-        if (!this.historyList) return;
-
-        try {
-            const history = JSON.parse(localStorage.getItem('mindmap_history') || '[]');
-            this.historyList.innerHTML = history.map(item => `
-                <div class="history-item" data-id="${item.id}">
-                    <div>${item.text.substring(0, 50)}${item.text.length > 50 ? '...' : ''}</div>
-                    <small>${item.date}</small>
-                </div>
-            `).join('');
-
-            this.historyList.querySelectorAll('.history-item').forEach(item => {
-                item.addEventListener('click', () => this.loadHistoryItem(item.dataset.id));
-            });
-        } catch (error) {
-            console.error('加载历史记录失败:', error);
-            this.showError('加载历史记录失败');
-        }
-    }
-
-    toggleHistory() {
-        if (!this.historyList) return;
-        const isVisible = this.historyList.style.display === 'block';
-        this.historyList.style.display = isVisible ? 'none' : 'block';
-    }
-
-    loadHistoryItem(id) {
-        try {
-            const history = JSON.parse(localStorage.getItem('mindmap_history') || '[]');
-            const item = history.find(h => h.id === parseInt(id));
-            if (item) {
-                const textInput = document.getElementById('text-input');
-                if (textInput) {
-                    textInput.value = item.text;
-                }
-                this.data = item.data;
-                if (this.graph) {
-                    this.graph.destroy();
-                }
-                this.initGraph();
-                this.graph.data(this.data);
-                this.graph.render();
-                this.graph.fitView();
-                this.toggleHistory();
-            }
-        } catch (error) {
-            console.error('加载历史记录项失败:', error);
-            this.showError('加载历史记录失败');
-        }
-    }
-
-    // 导出图片
     exportImage() {
-        if (!this.graph) {
+        if (!this.graph || !this.data) {
             this.showError('没有可导出的思维导图');
             return;
         }
 
         try {
-            const dataUrl = this.graph.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.download = `mindmap_${new Date().toISOString().slice(0,10)}.png`;
-            link.href = dataUrl;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            this.showError('导出成功');
+            // 下载图片
+            this.graph.downloadFullImage('mindmap', 'image/png', {
+                backgroundColor: this.isDarkTheme ? '#141414' : '#ffffff'
+            });
         } catch (error) {
-            console.error('导出图片失败:', error);
-            this.showError('导出图片失败，请重试');
+            this.showError('导出图片失败');
+            console.error('Error exporting image:', error);
         }
     }
 
-    // 原有的方法保持不变
-    parseText(text) {
-        // 保持原有的解析逻辑不变
-        return this.textAnalyzer.analyze(text);
+    toggleHistory() {
+        const historyPanel = document.getElementById('history-list');
+        const isVisible = historyPanel.style.display === 'block';
+
+        if (isVisible) {
+            historyPanel.style.display = 'none';
+        } else {
+            this.showHistory();
+        }
     }
 
-    initGraph() {
-        // 保持原有的图初始化逻辑不变
+    showHistory() {
+        const historyPanel = document.getElementById('history-list');
+        const history = JSON.parse(localStorage.getItem('mindmap_history') || '[]');
+
+        if (history.length === 0) {
+            historyPanel.innerHTML = '<div class="history-item">暂无历史记录</div>';
+        } else {
+            historyPanel.innerHTML = history.map(entry => `
+                <div class="history-item" data-id="${entry.id}">
+                    <div>${entry.title}</div>
+                    <small>${new Date(entry.timestamp).toLocaleString()}</small>
+                </div>
+            `).join('');
+
+            // 为每个历史记录项添加点击事件
+            historyPanel.querySelectorAll('.history-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const id = parseInt(item.dataset.id);
+                    const entry = history.find(h => h.id === id);
+                    if (entry) {
+                        document.getElementById('text-input').value = entry.text;
+                        this.data = entry.data;
+                        this.renderMindMap();
+                        historyPanel.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        historyPanel.style.display = 'block';
     }
 }
 
-// TextAnalyzer 类保持不变
-class TextAnalyzer {
-    constructor() {
-        // 关键词权重
-        this.keywordWeights = {
-            action: ['如何', '怎样', '方法', '步骤', '措施', '执行', '实施', '开展', '推进', '落实', '实现', '完成', '提升', '优化', '改进'],
-            result: ['结果', '成效', '影响', '作用', '效果', '产出', '价值', '意义', '贡献', '成果', '优势', '表现', '收益'],
-            criteria: ['标准', '要求', '规范', '准则', '原则', '评价', '考核', '衡量', '判断', '评估', '指标', '质量'],
-            concept: ['概念', '定义', '理论', '含义', '本质', '特点', '特征', '属性', '范畴', '体系', '模式', '机制'],
-            logic: ['因此', '所以', '导致', '引起', '造成', '决定', '影响', '促进', '制约', '关系', '基于', '由于'],
-            evidence: ['数据', '研究', '调查', '证明', '表明', '显示', '证据', '案例', '实例', '统计', '分析', '报告'],
-            viewpoint: ['认为', '观点', '看法', '主张', '建议', '提出', '强调', '指出', '说明', '论述', '表示', '阐述'],
-            condition: ['如果', '假设', '前提', '条件', '情况下', '场景', '环境', '背景'],
-            challenge: ['问题', '挑战', '困难', '障碍', '瓶颈', '风险', '隐患', '局限'],
-            solution: ['解决', '应对', '克服', '突破', '改善', '优化', '完善', '提升']
-        };
-        
-        // 语义关联词
-        this.semanticRelations = {
-            cause: ['因为', '由于', '导致', '引起', '使得', '致使', '促使', '基于', '源于'],
-            result: ['所以', '因此', '故而', '从而', '致使', '造成', '最终', '结果'],
-            contrast: ['但是', '然而', '相反', '不过', '尽管', '虽然', '反而', '却'],
-            supplement: ['而且', '并且', '同时', '此外', '另外', '还有', '不仅', '除此之外'],
-            condition: ['如果', '假如', '假设', '一旦', '只要', '除非', '在...情况下'],
-            purpose: ['为了', '旨在', '目的是', '用来', '用于', '以便', '为此', '争取']
-        };
-
-        // 段落结构词
-        this.structureIndicators = {
-            summary: ['总的来说', '综上所述', '归纳起来', '简而言之', '总而言之'],
-            sequence: ['首先', '其次', '然后', '接着', '最后', '第一', '第二'],
-            emphasis: ['重点是', '关键是', '核心是', '主要是', '特别是', '尤其是'],
-            example: ['例如', '比如', '举例来说', '以...为例', '就像', '譬如'],
-            transition: ['另外', '此外', '同时', '不仅如此', '与此同时', '在此基础上']
-        };
-
-        // 观点强度标记词
-        this.viewStrength = {
-            strong: ['必须', '一定', '肯定', '确实', '显然', '毫无疑问'],
-            moderate: ['可能', '也许', '大概', '估计', '应该', '或许'],
-            weak: ['可能', '或许', '似乎', '好像', '据说', '传言']
-        };
-
-        // 情感倾向词
-        this.sentimentWords = {
-            positive: ['好', '优秀', '出色', '卓越', '优化', '改进', '提升', '增强'],
-            negative: ['差', '糟糕', '问题', '困难', '劣势', '不足', '缺陷', '风险'],
-            neutral: ['普通', '一般', '正常', '标准', '通常', '平均', '中等']
-        };
-    }
-
-    // 分析文本结构和深层语义
-    analyzeText(text) {
-        // 分段
-        const paragraphs = text.split(/\n+/).filter(p => p.trim());
-        
-        // 提取主题
-        const mainTopic = this.extractMainTopic(paragraphs[0]);
-        
-        // 分析段落结构
-        const structure = this.analyzeParagraphStructure(paragraphs);
-        
-        // 提取关键信息
-        const keyInfo = {
-            challenges: this.extractKeywordBasedInfo(text, 'challenge'),
-            solutions: this.extractKeywordBasedInfo(text, 'solution'),
-            conditions: this.extractConditions(text),
-            viewpoints: this.extractViewpoints(text),
-            evidence: this.extractEvidence(text),
-            logicChains: this.extractLogicChains(text)
-        };
-
-        // 深度语义分析
-        const semanticAnalysis = {
-            relations: this.analyzeSemanticRelations(text),
-            sentiment: this.analyzeSentiment(text),
-            emphasis: this.findEmphasisPoints(text)
-        };
-        
-        return {
-            topic: mainTopic,
-            structure: this.enrichStructure(structure, semanticAnalysis),
-            keyInfo: this.prioritizeContent(keyInfo),
-            semantics: semanticAnalysis
-        };
-    }
-
-    // 提取条件和场景
-    extractConditions(text) {
-        const conditions = [];
-        const sentences = text.split(/[。！？]/);
-        
-        sentences.forEach(sentence => {
-            this.keywordWeights.condition.forEach(keyword => {
-                if (sentence.includes(keyword)) {
-                    const condition = {
-                        type: 'condition',
-                        content: this.extractCoreSentence(sentence),
-                        context: this.findRelatedContext(sentence, sentences)
-                    };
-                    conditions.push(condition);
-                }
-            });
-        });
-        
-        return conditions;
-    }
-
-    // 分析情感倾向
-    analyzeSentiment(text) {
-        let sentiment = {
-            positive: 0,
-            negative: 0,
-            neutral: 0
-        };
-        
-        Object.entries(this.sentimentWords).forEach(([type, words]) => {
-            words.forEach(word => {
-                const matches = text.match(new RegExp(word, 'g'));
-                if (matches) {
-                    sentiment[type] += matches.length;
-                }
-            });
-        });
-        
-        return sentiment;
-    }
-
-    // 查找重点强调内容
-    findEmphasisPoints(text) {
-        const emphasisPoints = [];
-        const sentences = text.split(/[。！？]/);
-        
-        sentences.forEach(sentence => {
-            this.structureIndicators.emphasis.forEach(keyword => {
-                if (sentence.includes(keyword)) {
-                    emphasisPoints.push({
-                        point: this.extractCoreSentence(sentence),
-                        strength: this.determineEmphasisStrength(sentence)
-                    });
-                }
-            });
-        });
-        
-        return emphasisPoints;
-    }
-
-    // 确定强调程度
-    determineEmphasisStrength(sentence) {
-        for (const [strength, words] of Object.entries(this.viewStrength)) {
-            if (words.some(word => sentence.includes(word))) {
-                return strength;
-            }
-        }
-        return 'moderate';
-    }
-
-    // 内容优先级排序
-    prioritizeContent(keyInfo) {
-        const prioritized = {};
-        
-        Object.entries(keyInfo).forEach(([key, items]) => {
-            if (Array.isArray(items)) {
-                prioritized[key] = items.map(item => ({
-                    ...item,
-                    priority: this.calculatePriority(item)
-                })).sort((a, b) => b.priority - a.priority);
-            }
-        });
-        
-        return prioritized;
-    }
-
-    // 计算内容优先级
-    calculatePriority(item) {
-        let priority = 0;
-        
-        // 基于强调词
-        if (this.structureIndicators.emphasis.some(word => 
-            item.content?.includes(word)
-        )) {
-            priority += 3;
-        }
-        
-        // 基于情感强度
-        if (this.viewStrength.strong.some(word => 
-            item.content?.includes(word)
-        )) {
-            priority += 2;
-        }
-        
-        // 基于证据支持
-        if (item.evidence?.length > 0) {
-            priority += item.evidence.length;
-        }
-        
-        return priority;
-    }
-
-    {{ ... }}  // 保留其他现有方法
-}
-
-// 初始化
-window.onload = () => {
+// 初始化应用
+document.addEventListener('DOMContentLoaded', () => {
     new MindMap();
-};
+});

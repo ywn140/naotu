@@ -4,14 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>智能思维导图生成器</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://gw.alipayobjects.com/os/lib/antv/g6/4.3.11/dist/g6.min.js"></script>
     <style>
-        /* 主题相关样式 */
         :root {
             --primary-color: #1890ff;
             --background-color: #ffffff;
             --text-color: #333333;
             --border-color: #e8e8e8;
+            --sidebar-width: 250px;
+            --header-height: 60px;
         }
 
         [data-theme="dark"] {
@@ -21,170 +23,130 @@
             --border-color: #434343;
         }
 
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background-color: var(--background-color);
             color: var(--text-color);
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        /* 工具栏样式 */
-        .toolbar {
+            min-height: 100vh;
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
         }
 
-        .toolbar button {
-            padding: 8px 16px;
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: opacity 0.2s;
-        }
-
-        .toolbar button:hover {
-            opacity: 0.8;
-        }
-
-        /* 历史记录样式 */
-        .history-list {
-            display: none;
+        /* 侧边栏样式 */
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: var(--background-color);
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
             position: fixed;
-            right: 20px;
-            top: 20px;
-            background: var(--background-color);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            padding: 10px;
-            max-width: 300px;
-            max-height: 400px;
-            overflow-y: auto;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            height: 100vh;
+            left: 0;
+            top: 0;
         }
 
-        .history-item {
-            padding: 8px;
-            border-bottom: 1px solid var(--border-color);
+        .sidebar-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+
+        .sidebar-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-radius: 8px;
             cursor: pointer;
+            transition: background-color 0.2s;
+            color: var(--text-color);
+            text-decoration: none;
         }
 
-        .history-item:hover {
-            background: rgba(0,0,0,0.05);
+        .menu-item:hover {
+            background-color: rgba(24, 144, 255, 0.1);
+        }
+
+        .menu-item i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+        }
+
+        /* 主要内容区域 */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
         .input-section {
             margin-bottom: 20px;
-            padding: 20px;
-            background-color: #f9f9f9;
-            border-radius: 8px;
-            position: relative;
         }
-        
+
         textarea {
             width: 100%;
-            min-height: 150px;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            height: 200px;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--background-color);
+            color: var(--text-color);
             resize: vertical;
-            font-size: 14px;
-            line-height: 1.5;
-            margin-bottom: 10px;
+            font-size: 16px;
+            margin-bottom: 15px;
         }
-        
+
         button {
-            background-color: #1890ff;
+            padding: 10px 20px;
+            background-color: var(--primary-color);
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: opacity 0.2s;
         }
-        
+
         button:hover {
-            background-color: #40a9ff;
+            opacity: 0.9;
         }
-        
+
         button:disabled {
-            background-color: #bfbfbf;
+            opacity: 0.5;
             cursor: not-allowed;
-            opacity: 0.7;
         }
-        
+
         #mindmap {
-            width: 100%;
-            height: 600px;
-            border: 1px solid #eee;
-            border-radius: 4px;
-            background-color: #fff;
-            position: relative;
-        }
-        
-        .instructions {
-            margin-top: 20px;
-            padding: 15px;
-            background-color: #f0f9ff;
-            border-radius: 4px;
-            font-size: 14px;
-            color: #666;
-        }
-
-        .loading-container {
-            display: none;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 20px;
+            flex: 1;
+            border: 1px solid var(--border-color);
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            z-index: 1000;
+            overflow: hidden;
+            min-height: 500px;
         }
 
-        .loading-spinner {
-            display: inline-block;
-            width: 40px;
-            height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #1890ff;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 10px;
-        }
-
-        .loading-text {
-            color: #666;
-            font-size: 14px;
-            margin-top: 10px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .error-message {
-            display: none;
-            color: #ff4d4f;
-            margin-top: 10px;
-            padding: 8px 12px;
-            background-color: #fff2f0;
-            border: 1px solid #ffccc7;
-            border-radius: 4px;
-        }
-
+        /* 加载动画 */
         .loading {
             display: none;
             position: fixed;
@@ -196,11 +158,12 @@
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             z-index: 1000;
+            text-align: center;
         }
 
         .loading-spinner {
             border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
+            border-top: 4px solid var(--primary-color);
             border-radius: 50%;
             width: 40px;
             height: 40px;
@@ -213,85 +176,131 @@
             100% { transform: rotate(360deg); }
         }
 
+        /* 错误提示 */
         .error-message {
             display: none;
             position: fixed;
             top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #ff5252;
+            right: 20px;
+            background: #ff4d4f;
             color: white;
             padding: 12px 24px;
-            border-radius: 4px;
+            border-radius: 6px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             z-index: 1000;
-            animation: slideDown 0.3s ease-out;
+            animation: slideIn 0.3s ease-out;
         }
 
-        @keyframes slideDown {
-            from { top: -100px; opacity: 0; }
-            to { top: 20px; opacity: 1; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
         }
 
+        /* 历史记录面板 */
+        .history-panel {
+            display: none;
+            position: fixed;
+            right: 0;
+            top: 0;
+            width: 300px;
+            height: 100vh;
+            background: var(--background-color);
+            border-left: 1px solid var(--border-color);
+            padding: 20px;
+            overflow-y: auto;
+            z-index: 100;
+            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+        }
+
+        .history-item {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .history-item:hover {
+            background-color: rgba(0,0,0,0.05);
+        }
+
+        .history-item small {
+            color: #666;
+            display: block;
+            margin-top: 5px;
+        }
+
+        /* 响应式设计 */
         @media (max-width: 768px) {
-            .container {
+            .sidebar {
+                width: 60px;
                 padding: 10px;
             }
-            
-            textarea {
-                height: 150px;
+
+            .sidebar-header h1,
+            .menu-item span {
+                display: none;
             }
-            
-            #mindmap {
-                height: calc(100vh - 300px);
+
+            .main-content {
+                margin-left: 60px;
+            }
+
+            .history-panel {
+                width: 100%;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>智能思维导图生成器</h1>
-        
-        <div class="toolbar">
-            <button id="theme-toggle">切换主题</button>
-            <button id="save-btn">保存</button>
-            <button id="export-btn">导出图片</button>
-            <button id="history-btn">历史记录</button>
+    <!-- 侧边栏 -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1>思维导图</h1>
         </div>
-
-        <div class="input-section">
-            <textarea id="text-input" placeholder="请输入要分析的文本内容..."></textarea>
-            <button id="generate-btn">生成思维导图</button>
-            <div id="error" class="error-message"></div>
-        </div>
-        
-        <div id="mindmap">
-            <div id="loading" class="loading-container">
-                <div class="loading-spinner"></div>
-                <div class="loading-text">思维导图生成中，请稍候...</div>
-            </div>
-        </div>
-        
-        <div class="instructions">
-            <h3>使用说明：</h3>
-            <ol>
-                <li>在文本框中输入要分析的内容</li>
-                <li>点击"生成思维导图"按钮</li>
-                <li>系统将自动分析文本并生成思维导图</li>
-                <li>可以使用鼠标拖拽移动画布，滚轮缩放视图</li>
-            </ol>
+        <div class="sidebar-menu">
+            <a class="menu-item" id="theme-toggle">
+                <i class="fas fa-moon"></i>
+                <span>切换主题</span>
+            </a>
+            <a class="menu-item" id="save-btn">
+                <i class="fas fa-save"></i>
+                <span>保存</span>
+            </a>
+            <a class="menu-item" id="export-btn">
+                <i class="fas fa-file-export"></i>
+                <span>导出图片</span>
+            </a>
+            <a class="menu-item" id="history-btn">
+                <i class="fas fa-history"></i>
+                <span>历史记录</span>
+            </a>
         </div>
     </div>
-    
+
+    <!-- 主要内容区域 -->
+    <div class="main-content">
+        <div class="input-section">
+            <textarea id="text-input" placeholder="请输入要分析的文本内容..."></textarea>
+            <button id="generate-btn">
+                <i class="fas fa-magic"></i>
+                生成思维导图
+            </button>
+        </div>
+        <div id="mindmap"></div>
+    </div>
+
+    <!-- 加载动画 -->
     <div class="loading">
         <div class="loading-spinner"></div>
         <div>正在生成思维导图...</div>
     </div>
-    
+
+    <!-- 错误提示 -->
     <div class="error-message"></div>
-    
-    <div class="history-list" id="history-list"></div>
-    
+
+    <!-- 历史记录面板 -->
+    <div class="history-panel" id="history-list"></div>
+
     <script>
         class MindMap {
             constructor() {
@@ -523,7 +532,7 @@
                                 baseConfig.style.stroke = '#DDC3A5';
                                 baseConfig.labelCfg.style.fill = '#2A2A2A';
                                 baseConfig.labelCfg.style.fontSize = 12;
-                                baseConfig.labelCfg.style.fontWeight = 400;
+                                baseConfig.labelCfg.style.fontWeight: 400;
                         }
 
                         return baseConfig;
