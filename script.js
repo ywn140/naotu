@@ -5,7 +5,10 @@ class MindMap {
         this.data = null;
         this.loading = document.querySelector('.loading');
         this.errorMessage = document.querySelector('.error-message');
+        this.historyList = document.querySelector('#historyList');
+        this.currentTheme = localStorage.getItem('theme') || 'light';
         this.init();
+        this.loadTheme();
     }
 
     async init() {
@@ -76,6 +79,10 @@ class MindMap {
     bindEvents() {
         const generateBtn = document.getElementById('generateBtn');
         const textInput = document.getElementById('textInput');
+        const saveBtn = document.getElementById('saveBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        const historyBtn = document.getElementById('historyBtn');
+        const themeToggle = document.getElementById('themeToggle');
         
         if (generateBtn && textInput) {
             generateBtn.onclick = async () => {
@@ -103,6 +110,11 @@ class MindMap {
                 this.hideError();
             };
         }
+
+        saveBtn.addEventListener('click', () => this.saveMindMap());
+        exportBtn.addEventListener('click', () => this.exportImage());
+        historyBtn.addEventListener('click', () => this.toggleHistory());
+        themeToggle.addEventListener('click', () => this.toggleTheme());
     }
 
     showLoading() {
@@ -257,6 +269,99 @@ class MindMap {
             logicChains: '逻辑链条'
         };
         return labels[category] || category;
+    }
+
+    // 主题切换
+    loadTheme() {
+        document.documentElement.setAttribute('data-theme', this.currentTheme);
+    }
+
+    toggleTheme() {
+        this.currentTheme = this.currentTheme === 'light' ? 'dark' : 'light';
+        localStorage.setItem('theme', this.currentTheme);
+        this.loadTheme();
+    }
+
+    // 保存思维导图
+    saveMindMap() {
+        const inputText = document.getElementById('textInput').value.trim();
+        if (!inputText || !this.data) {
+            this.showError('没有可保存的思维导图');
+            return;
+        }
+
+        const history = JSON.parse(localStorage.getItem('mindmap_history') || '[]');
+        const newItem = {
+            id: Date.now(),
+            text: inputText,
+            data: this.data,
+            date: new Date().toLocaleString()
+        };
+
+        history.unshift(newItem);
+        if (history.length > 10) history.pop(); // 最多保存10条记录
+
+        localStorage.setItem('mindmap_history', JSON.stringify(history));
+        this.showError('保存成功');
+        this.loadHistory();
+    }
+
+    // 加载历史记录
+    loadHistory() {
+        const history = JSON.parse(localStorage.getItem('mindmap_history') || '[]');
+        this.historyList.innerHTML = history.map(item => `
+            <div class="history-item" data-id="${item.id}">
+                <div>${item.text.substring(0, 50)}${item.text.length > 50 ? '...' : ''}</div>
+                <small>${item.date}</small>
+            </div>
+        `).join('');
+
+        this.historyList.querySelectorAll('.history-item').forEach(item => {
+            item.addEventListener('click', () => this.loadHistoryItem(item.dataset.id));
+        });
+    }
+
+    toggleHistory() {
+        const isVisible = this.historyList.style.display === 'block';
+        this.historyList.style.display = isVisible ? 'none' : 'block';
+    }
+
+    loadHistoryItem(id) {
+        const history = JSON.parse(localStorage.getItem('mindmap_history') || '[]');
+        const item = history.find(h => h.id === parseInt(id));
+        if (item) {
+            document.getElementById('textInput').value = item.text;
+            this.data = item.data;
+            if (this.graph) {
+                this.graph.destroy();
+            }
+            this.initGraph();
+            this.graph.data(this.data);
+            this.graph.render();
+            this.graph.fitView();
+            this.toggleHistory();
+        }
+    }
+
+    // 导出图片
+    exportImage() {
+        if (!this.graph) {
+            this.showError('没有可导出的思维导图');
+            return;
+        }
+
+        try {
+            const dataUrl = this.graph.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = `mindmap_${new Date().toISOString().slice(0,10)}.png`;
+            link.href = dataUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (error) {
+            console.error('导出图片时出错:', error);
+            this.showError('导出图片失败，请重试');
+        }
     }
 }
 
