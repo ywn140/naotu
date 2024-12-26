@@ -140,11 +140,8 @@ class MindMap {
             // 分析文本
             const analysis = this.textAnalyzer.analyzeText(text);
             
-            // 转换为思维导图数据结构
-            const mindmapData = this.convertToMindmapData(analysis);
-            
             // 渲染思维导图
-            this.renderMindmap(mindmapData);
+            this.renderMindmap(analysis);
             
         } catch (error) {
             console.error('处理文本失败:', error);
@@ -152,84 +149,123 @@ class MindMap {
         }
     }
 
-    // 转换为思维导图数据结构
-    convertToMindmapData(analysis) {
-        const { topic, structure, keyInfo } = analysis;
-        
-        // 构建根节点
-        const root = {
-            id: 'root',
-            label: topic,
-            children: []
-        };
-        
-        // 添加结构节点
-        root.children = this.convertStructureToNodes(structure);
-        
-        // 添加关键信息节点
-        this.addKeyInfoNodes(root, keyInfo);
-        
-        return root;
-    }
-
-    // 转换结构为节点
-    convertStructureToNodes(structure, parentId = 'root') {
-        return structure.map((item, index) => {
-            const node = {
-                id: `${parentId}-${index}`,
-                label: item.topic,
-                children: []
-            };
-            
-            // 添加关键点
-            if (item.keyPoints && item.keyPoints.length > 0) {
-                node.children = item.keyPoints.map((point, pointIndex) => ({
-                    id: `${node.id}-point-${pointIndex}`,
-                    label: point
-                }));
-            }
-            
-            // 递归处理子节点
-            if (item.children && item.children.length > 0) {
-                node.children = [
-                    ...node.children,
-                    ...this.convertStructureToNodes(item.children, node.id)
-                ];
-            }
-            
-            return node;
-        });
-    }
-
-    // 添加关键信息节点
-    addKeyInfoNodes(root, keyInfo) {
-        const categories = {
-            actions: '行动项',
-            results: '结果',
-            criteria: '评价标准',
-            concepts: '相关概念'
-        };
-        
-        Object.entries(keyInfo).forEach(([key, items]) => {
-            if (items.length > 0) {
-                const categoryNode = {
-                    id: `key-${key}`,
-                    label: categories[key],
-                    children: items.map((item, index) => ({
-                        id: `${key}-item-${index}`,
-                        label: item
-                    }))
-                };
-                root.children.push(categoryNode);
-            }
-        });
-    }
-
     // 渲染思维导图
     renderMindmap(data) {
-        this.graph.data(data);
+        const nodes = [];
+        const edges = [];
+        let id = 0;
+
+        // 创建根节点
+        const rootNode = {
+            id: String(id++),
+            label: data.topic,
+            type: 'root-node',
+            style: {
+                fill: '#e6f7ff',
+                stroke: '#91d5ff'
+            }
+        };
+        nodes.push(rootNode);
+
+        // 添加结构节点
+        data.structure.forEach(item => {
+            const nodeId = String(id++);
+            nodes.push({
+                id: nodeId,
+                label: item.topic,
+                type: 'structure-node',
+                style: {
+                    fill: this.getNodeColor(item.importance),
+                    stroke: '#91d5ff'
+                }
+            });
+            edges.push({
+                source: rootNode.id,
+                target: nodeId
+            });
+
+            // 添加子节点
+            if (item.children) {
+                item.children.forEach(child => {
+                    const childId = String(id++);
+                    nodes.push({
+                        id: childId,
+                        label: child.content,
+                        type: 'content-node'
+                    });
+                    edges.push({
+                        source: nodeId,
+                        target: childId
+                    });
+                });
+            }
+        });
+
+        // 添加关键信息节点
+        Object.entries(data.keyInfo).forEach(([category, items]) => {
+            if (items && items.length > 0) {
+                const categoryId = String(id++);
+                nodes.push({
+                    id: categoryId,
+                    label: this.getCategoryLabel(category),
+                    type: 'category-node'
+                });
+                edges.push({
+                    source: rootNode.id,
+                    target: categoryId
+                });
+
+                items.forEach(item => {
+                    const itemId = String(id++);
+                    nodes.push({
+                        id: itemId,
+                        label: item.content || item,
+                        type: 'info-node',
+                        style: {
+                            fill: this.getPriorityColor(item.priority)
+                        }
+                    });
+                    edges.push({
+                        source: categoryId,
+                        target: itemId
+                    });
+                });
+            }
+        });
+
+        this.graph.data({ nodes, edges });
         this.graph.render();
         this.graph.fitView();
+    }
+
+    // 获取节点颜色
+    getNodeColor(importance) {
+        const colors = {
+            high: '#f6ffed',
+            medium: '#e6f7ff',
+            low: '#fff7e6'
+        };
+        return colors[importance] || colors.medium;
+    }
+
+    // 获取优先级颜色
+    getPriorityColor(priority) {
+        if (priority >= 5) return '#f6ffed';
+        if (priority >= 3) return '#e6f7ff';
+        return '#fff7e6';
+    }
+
+    // 获取分类标签
+    getCategoryLabel(category) {
+        const labels = {
+            challenges: '问题与挑战',
+            solutions: '解决方案',
+            conditions: '条件与场景',
+            viewpoints: '观点与建议',
+            evidence: '证据支持',
+            logicChains: '逻辑链条'
+        };
+        return labels[category] || category;
     }
 }
 
@@ -237,22 +273,53 @@ class TextAnalyzer {
     constructor() {
         // 关键词权重
         this.keywordWeights = {
-            action: ['如何', '怎样', '方法', '步骤', '措施', '执行', '实施', '开展', '推进'],
-            result: ['结果', '成效', '影响', '作用', '效果', '产出', '价值'],
-            criteria: ['标准', '要求', '规范', '准则', '原则', '评价', '考核'],
-            concept: ['概念', '定义', '理论', '含义', '本质', '特点', '特征']
+            action: ['如何', '怎样', '方法', '步骤', '措施', '执行', '实施', '开展', '推进', '落实', '实现', '完成', '提升', '优化', '改进'],
+            result: ['结果', '成效', '影响', '作用', '效果', '产出', '价值', '意义', '贡献', '成果', '优势', '表现', '收益'],
+            criteria: ['标准', '要求', '规范', '准则', '原则', '评价', '考核', '衡量', '判断', '评估', '指标', '质量'],
+            concept: ['概念', '定义', '理论', '含义', '本质', '特点', '特征', '属性', '范畴', '体系', '模式', '机制'],
+            logic: ['因此', '所以', '导致', '引起', '造成', '决定', '影响', '促进', '制约', '关系', '基于', '由于'],
+            evidence: ['数据', '研究', '调查', '证明', '表明', '显示', '证据', '案例', '实例', '统计', '分析', '报告'],
+            viewpoint: ['认为', '观点', '看法', '主张', '建议', '提出', '强调', '指出', '说明', '论述', '表示', '阐述'],
+            condition: ['如果', '假设', '前提', '条件', '情况下', '场景', '环境', '背景'],
+            challenge: ['问题', '挑战', '困难', '障碍', '瓶颈', '风险', '隐患', '局限'],
+            solution: ['解决', '应对', '克服', '突破', '改善', '优化', '完善', '提升']
         };
         
-        // 层级关系词
-        this.hierarchyIndicators = {
-            level1: ['首先', '其次', '最后', '另外', '此外'],
-            level2: ['包括', '包含', '例如', '比如', '具体'],
-            level3: ['其中', '特别是', '尤其是', '主要是'],
-            level4: ['表现为', '体现在', '反映在', '具体来说']
+        // 语义关联词
+        this.semanticRelations = {
+            cause: ['因为', '由于', '导致', '引起', '使得', '致使', '促使', '基于', '源于'],
+            result: ['所以', '因此', '故而', '从而', '致使', '造成', '最终', '结果'],
+            contrast: ['但是', '然而', '相反', '不过', '尽管', '虽然', '反而', '却'],
+            supplement: ['而且', '并且', '同时', '此外', '另外', '还有', '不仅', '除此之外'],
+            condition: ['如果', '假如', '假设', '一旦', '只要', '除非', '在...情况下'],
+            purpose: ['为了', '旨在', '目的是', '用来', '用于', '以便', '为此', '争取']
+        };
+
+        // 段落结构词
+        this.structureIndicators = {
+            summary: ['总的来说', '综上所述', '归纳起来', '简而言之', '总而言之'],
+            sequence: ['首先', '其次', '然后', '接着', '最后', '第一', '第二'],
+            emphasis: ['重点是', '关键是', '核心是', '主要是', '特别是', '尤其是'],
+            example: ['例如', '比如', '举例来说', '以...为例', '就像', '譬如'],
+            transition: ['另外', '此外', '同时', '不仅如此', '与此同时', '在此基础上']
+        };
+
+        // 观点强度标记词
+        this.viewStrength = {
+            strong: ['必须', '一定', '肯定', '确实', '显然', '毫无疑问'],
+            moderate: ['可能', '也许', '大概', '估计', '应该', '或许'],
+            weak: ['可能', '或许', '似乎', '好像', '据说', '传言']
+        };
+
+        // 情感倾向词
+        this.sentimentWords = {
+            positive: ['好', '优秀', '出色', '卓越', '优化', '改进', '提升', '增强'],
+            negative: ['差', '糟糕', '问题', '困难', '劣势', '不足', '缺陷', '风险'],
+            neutral: ['普通', '一般', '正常', '标准', '通常', '平均', '中等']
         };
     }
 
-    // 分析文本结构
+    // 分析文本结构和深层语义
     analyzeText(text) {
         // 分段
         const paragraphs = text.split(/\n+/).filter(p => p.trim());
@@ -265,185 +332,142 @@ class TextAnalyzer {
         
         // 提取关键信息
         const keyInfo = {
-            actions: this.extractKeywordBasedInfo(text, 'action'),
-            results: this.extractKeywordBasedInfo(text, 'result'),
-            criteria: this.extractKeywordBasedInfo(text, 'criteria'),
-            concepts: this.extractKeywordBasedInfo(text, 'concept')
+            challenges: this.extractKeywordBasedInfo(text, 'challenge'),
+            solutions: this.extractKeywordBasedInfo(text, 'solution'),
+            conditions: this.extractConditions(text),
+            viewpoints: this.extractViewpoints(text),
+            evidence: this.extractEvidence(text),
+            logicChains: this.extractLogicChains(text)
+        };
+
+        // 深度语义分析
+        const semanticAnalysis = {
+            relations: this.analyzeSemanticRelations(text),
+            sentiment: this.analyzeSentiment(text),
+            emphasis: this.findEmphasisPoints(text)
         };
         
         return {
             topic: mainTopic,
-            structure: structure,
-            keyInfo: keyInfo
+            structure: this.enrichStructure(structure, semanticAnalysis),
+            keyInfo: this.prioritizeContent(keyInfo),
+            semantics: semanticAnalysis
         };
     }
 
-    // 提取主题
-    extractMainTopic(text) {
-        const topics = [];
+    // 提取条件和场景
+    extractConditions(text) {
+        const conditions = [];
+        const sentences = text.split(/[。！？]/);
         
-        // 通过关键词识别主题
-        const topicPatterns = [
-            /关于(.{2,20})(的|地)/,
-            /(.{2,20})(问题|情况|研究)/,
-            /如何(.{2,20})/,
-            /(.{2,20})(的主要内容)/
-        ];
-        
-        for (const pattern of topicPatterns) {
-            const match = text.match(pattern);
-            if (match) {
-                topics.push(match[1]);
-            }
-        }
-        
-        // 如果没有找到明确的主题，使用第一句话的主要内容
-        if (topics.length === 0) {
-            const firstSentence = text.split(/[。！？]/)[0];
-            topics.push(this.extractCoreSentence(firstSentence));
-        }
-        
-        return topics[0] || text.slice(0, 20);
-    }
-
-    // 分析段落结构
-    analyzeParagraphStructure(paragraphs) {
-        const structure = [];
-        
-        paragraphs.forEach(paragraph => {
-            // 检测段落层级
-            const level = this.detectParagraphLevel(paragraph);
-            
-            // 提取段落主题
-            const topic = this.extractParagraphTopic(paragraph);
-            
-            // 提取关键点
-            const keyPoints = this.extractKeyPoints(paragraph);
-            
-            structure.push({
-                level,
-                topic,
-                keyPoints,
-                content: paragraph
+        sentences.forEach(sentence => {
+            this.keywordWeights.condition.forEach(keyword => {
+                if (sentence.includes(keyword)) {
+                    const condition = {
+                        type: 'condition',
+                        content: this.extractCoreSentence(sentence),
+                        context: this.findRelatedContext(sentence, sentences)
+                    };
+                    conditions.push(condition);
+                }
             });
         });
         
-        return this.organizeHierarchy(structure);
+        return conditions;
     }
 
-    // 检测段落层级
-    detectParagraphLevel(paragraph) {
-        for (const [level, indicators] of Object.entries(this.hierarchyIndicators)) {
-            if (indicators.some(indicator => paragraph.includes(indicator))) {
-                return parseInt(level.replace('level', ''));
+    // 分析情感倾向
+    analyzeSentiment(text) {
+        let sentiment = {
+            positive: 0,
+            negative: 0,
+            neutral: 0
+        };
+        
+        Object.entries(this.sentimentWords).forEach(([type, words]) => {
+            words.forEach(word => {
+                const matches = text.match(new RegExp(word, 'g'));
+                if (matches) {
+                    sentiment[type] += matches.length;
+                }
+            });
+        });
+        
+        return sentiment;
+    }
+
+    // 查找重点强调内容
+    findEmphasisPoints(text) {
+        const emphasisPoints = [];
+        const sentences = text.split(/[。！？]/);
+        
+        sentences.forEach(sentence => {
+            this.structureIndicators.emphasis.forEach(keyword => {
+                if (sentence.includes(keyword)) {
+                    emphasisPoints.push({
+                        point: this.extractCoreSentence(sentence),
+                        strength: this.determineEmphasisStrength(sentence)
+                    });
+                }
+            });
+        });
+        
+        return emphasisPoints;
+    }
+
+    // 确定强调程度
+    determineEmphasisStrength(sentence) {
+        for (const [strength, words] of Object.entries(this.viewStrength)) {
+            if (words.some(word => sentence.includes(word))) {
+                return strength;
             }
         }
-        return 1;
+        return 'moderate';
     }
 
-    // 提取段落主题
-    extractParagraphTopic(paragraph) {
-        // 分句
-        const sentences = paragraph.split(/[。！？]/);
+    // 内容优先级排序
+    prioritizeContent(keyInfo) {
+        const prioritized = {};
         
-        // 找到最有可能是主题的句子
-        const topicSentence = sentences.reduce((best, current) => {
-            const bestScore = this.calculateTopicScore(best);
-            const currentScore = this.calculateTopicScore(current);
-            return currentScore > bestScore ? current : best;
-        });
-        
-        return this.extractCoreSentence(topicSentence);
-    }
-
-    // 计算句子作为主题的得分
-    calculateTopicScore(sentence) {
-        let score = 0;
-        
-        // 包含主题关键词
-        if (/主要|关键|核心|重点|总体|概括/.test(sentence)) score += 3;
-        
-        // 句子长度适中
-        if (sentence.length >= 5 && sentence.length <= 20) score += 2;
-        
-        // 包含层级指示词
-        Object.values(this.hierarchyIndicators).flat().forEach(indicator => {
-            if (sentence.includes(indicator)) score += 1;
-        });
-        
-        return score;
-    }
-
-    // 提取核心句子内容
-    extractCoreSentence(sentence) {
-        // 移除常见的修饰词
-        return sentence
-            .replace(/^(关于|对于|针对|就|在|由于|因为|所以|因此|但是|然而|不过|总之|总的来说|综上所述).*/g, '')
-            .replace(/(的是|地|的).{0,3}$/g, '')
-            .trim();
-    }
-
-    // 提取关键点
-    extractKeyPoints(paragraph) {
-        const points = [];
-        const sentences = paragraph.split(/[。！？]/);
-        
-        sentences.forEach(sentence => {
-            if (this.isKeyPoint(sentence)) {
-                points.push(this.extractCoreSentence(sentence));
+        Object.entries(keyInfo).forEach(([key, items]) => {
+            if (Array.isArray(items)) {
+                prioritized[key] = items.map(item => ({
+                    ...item,
+                    priority: this.calculatePriority(item)
+                })).sort((a, b) => b.priority - a.priority);
             }
         });
         
-        return points;
+        return prioritized;
     }
 
-    // 判断是否是关键点
-    isKeyPoint(sentence) {
-        // 包含关键词
-        const hasKeyword = Object.values(this.keywordWeights)
-            .flat()
-            .some(keyword => sentence.includes(keyword));
-            
-        // 句子结构完整
-        const isComplete = sentence.length >= 5 && /[，；]/.test(sentence);
+    // 计算内容优先级
+    calculatePriority(item) {
+        let priority = 0;
         
-        return hasKeyword && isComplete;
+        // 基于强调词
+        if (this.structureIndicators.emphasis.some(word => 
+            item.content?.includes(word)
+        )) {
+            priority += 3;
+        }
+        
+        // 基于情感强度
+        if (this.viewStrength.strong.some(word => 
+            item.content?.includes(word)
+        )) {
+            priority += 2;
+        }
+        
+        // 基于证据支持
+        if (item.evidence?.length > 0) {
+            priority += item.evidence.length;
+        }
+        
+        return priority;
     }
 
-    // 提取基于关键词的信息
-    extractKeywordBasedInfo(text, type) {
-        const keywords = this.keywordWeights[type];
-        const info = [];
-        
-        const sentences = text.split(/[。！？]/);
-        sentences.forEach(sentence => {
-            if (keywords.some(keyword => sentence.includes(keyword))) {
-                info.push(this.extractCoreSentence(sentence));
-            }
-        });
-        
-        return info;
-    }
-
-    // 组织层级结构
-    organizeHierarchy(items) {
-        const root = { level: 0, children: [] };
-        const stack = [root];
-        
-        items.forEach(item => {
-            while (stack.length > 1 && stack[stack.length - 1].level >= item.level) {
-                stack.pop();
-            }
-            
-            const parent = stack[stack.length - 1];
-            if (!parent.children) parent.children = [];
-            parent.children.push(item);
-            
-            stack.push(item);
-        });
-        
-        return root.children;
-    }
+    {{ ... }}  // 保留其他现有方法
 }
 
 // 初始化
