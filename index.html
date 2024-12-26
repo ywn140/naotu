@@ -253,15 +253,15 @@
         <h1>智能思维导图生成器</h1>
         
         <div class="toolbar">
-            <button id="themeToggle">切换主题</button>
-            <button id="saveBtn">保存</button>
-            <button id="exportBtn">导出图片</button>
-            <button id="historyBtn">历史记录</button>
+            <button id="theme-toggle">切换主题</button>
+            <button id="save-btn">保存</button>
+            <button id="export-btn">导出图片</button>
+            <button id="history-btn">历史记录</button>
         </div>
 
         <div class="input-section">
-            <textarea id="textInput" placeholder="请输入要分析的文本内容..."></textarea>
-            <button id="generateBtn">生成思维导图</button>
+            <textarea id="text-input" placeholder="请输入要分析的文本内容..."></textarea>
+            <button id="generate-btn">生成思维导图</button>
             <div id="error" class="error-message"></div>
         </div>
         
@@ -290,7 +290,7 @@
     
     <div class="error-message"></div>
     
-    <div class="history-list" id="historyList"></div>
+    <div class="history-list" id="history-list"></div>
     
     <script>
         class MindMap {
@@ -301,14 +301,14 @@
             }
 
             init() {
-                const generateBtn = document.getElementById('generateBtn');
+                const generateBtn = document.getElementById('generate-btn');
                 if (generateBtn) {
                     generateBtn.addEventListener('click', () => this.handleGenerateClick());
                 }
             }
 
             async handleGenerateClick() {
-                const content = document.getElementById('textInput').value;
+                const content = document.getElementById('text-input').value;
                 if (!content) {
                     this.showError('请输入内容');
                     return;
@@ -735,13 +735,13 @@
         document.addEventListener('DOMContentLoaded', () => {
             const mindMap = new MindMap();
 
-            const generateBtn = document.getElementById('generateBtn');
+            const generateBtn = document.getElementById('generate-btn');
             generateBtn.addEventListener('click', () => {
                 mindMap.showLoading();
                 generateBtn.disabled = true;
             });
 
-            const textInput = document.getElementById('textInput');
+            const textInput = document.getElementById('text-input');
             textInput.addEventListener('input', () => {
                 generateBtn.disabled = !textInput.value.trim();
             });
