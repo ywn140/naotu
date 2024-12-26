@@ -1,6 +1,10 @@
 class MindMap {
     constructor() {
         this.textAnalyzer = new TextAnalyzer();
+        this.graph = null;
+        this.data = null;
+        this.loading = document.querySelector('.loading');
+        this.errorMessage = document.querySelector('.error-message');
         this.init();
     }
 
@@ -101,37 +105,24 @@ class MindMap {
         }
     }
 
-    // 显示加载状态
     showLoading() {
-        const loading = document.getElementById('loading');
-        if (loading) {
-            loading.style.display = 'block';
-        }
+        this.loading.style.display = 'block';
     }
 
-    // 隐藏加载状态
     hideLoading() {
-        const loading = document.getElementById('loading');
-        if (loading) {
-            loading.style.display = 'none';
-        }
+        this.loading.style.display = 'none';
     }
 
-    // 显示错误信息
     showError(message) {
-        const error = document.getElementById('error');
-        if (error) {
-            error.textContent = message;
-            error.style.display = 'block';
-        }
+        this.errorMessage.textContent = message;
+        this.errorMessage.style.display = 'block';
+        setTimeout(() => {
+            this.errorMessage.style.display = 'none';
+        }, 3000);
     }
 
-    // 隐藏错误信息
     hideError() {
-        const error = document.getElementById('error');
-        if (error) {
-            error.style.display = 'none';
-        }
+        this.errorMessage.style.display = 'none';
     }
 
     // 处理输入文本
