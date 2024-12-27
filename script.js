@@ -191,6 +191,42 @@ class MindMap {
         this.hideContextMenu();
     }
 
+    // 显示颜色选择器
+    showColorPicker() {
+        if (!this.selectedNode) {
+            this.showError('请先选择一个节点');
+            return;
+        }
+
+        const colorPicker = document.getElementById('colorPicker');
+        if (!colorPicker) {
+            console.error('颜色选择器元素未找到');
+            return;
+        }
+
+        // 获取选中节点的位置
+        const node = this.graph.findById(this.selectedNode);
+        const { x, y } = this.graph.getCanvasByPoint(node.getModel().x, node.getModel().y);
+
+        // 显示颜色选择器
+        colorPicker.style.display = 'flex';
+        colorPicker.style.left = `${x}px`;
+        colorPicker.style.top = `${y}px`;
+
+        // 点击其他地方时隐藏颜色选择器
+        const hideColorPicker = (e) => {
+            if (!colorPicker.contains(e.target)) {
+                colorPicker.style.display = 'none';
+                document.removeEventListener('click', hideColorPicker);
+            }
+        };
+
+        // 延迟添加事件监听，避免立即触发
+        setTimeout(() => {
+            document.addEventListener('click', hideColorPicker);
+        }, 0);
+    }
+
     // 切换主题
     toggleTheme() {
         const themes = Object.keys(this.themes);
