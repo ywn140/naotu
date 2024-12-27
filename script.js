@@ -6,6 +6,32 @@ class MindMap {
         this.errorMessage = document.querySelector('.error-message');
         this.textInput = document.getElementById('textInput');
         this.generateBtn = document.getElementById('generateBtn');
+        this.contextMenu = document.getElementById('nodeContextMenu');
+        this.selectedNode = null;
+        this.currentTheme = 'default';
+        this.themes = {
+            default: {
+                node: {
+                    default: { fill: '#FFFFFF', stroke: '#8B7E74' },
+                    root: { fill: '#8B7E74', stroke: '#8B7E74' },
+                    selected: { fill: '#E8F2FF', stroke: '#4A90E2' }
+                }
+            },
+            dark: {
+                node: {
+                    default: { fill: '#2C3E50', stroke: '#34495E', labelCfg: { style: { fill: '#FFFFFF' } } },
+                    root: { fill: '#34495E', stroke: '#34495E', labelCfg: { style: { fill: '#FFFFFF' } } },
+                    selected: { fill: '#3498DB', stroke: '#2980B9', labelCfg: { style: { fill: '#FFFFFF' } } }
+                }
+            },
+            colorful: {
+                node: {
+                    default: { fill: '#FFFFFF', stroke: '#4A90E2' },
+                    root: { fill: '#4A90E2', stroke: '#4A90E2' },
+                    selected: { fill: '#E8F2FF', stroke: '#4A90E2' }
+                }
+            }
+        };
         this.init();
     }
 
@@ -22,131 +48,146 @@ class MindMap {
             });
         }
 
+        // 添加工具栏事件监听
+        document.getElementById('addNodeBtn')?.addEventListener('click', () => this.addNode());
+        document.getElementById('deleteNodeBtn')?.addEventListener('click', () => this.deleteNode());
+        document.getElementById('editNodeBtn')?.addEventListener('click', () => this.editNode());
+        document.getElementById('colorNodeBtn')?.addEventListener('click', () => this.showColorPicker());
+        document.getElementById('themeBtn')?.addEventListener('click', () => this.toggleTheme());
+
+        // 添加右键菜单事件监听
+        document.getElementById('addChildNode')?.addEventListener('click', () => this.addNode());
+        document.getElementById('editNode')?.addEventListener('click', () => this.editNode());
+        document.getElementById('deleteNode')?.addEventListener('click', () => this.deleteNode());
+
+        // 添加颜色选择器事件监听
+        document.querySelectorAll('.color-option').forEach(option => {
+            option.addEventListener('click', (e) => {
+                const color = e.target.dataset.color;
+                this.changeNodeColor(color);
+            });
+        });
+
+        // 点击其他地方时隐藏右键菜单
+        document.addEventListener('click', (e) => {
+            if (!this.contextMenu.contains(e.target)) {
+                this.hideContextMenu();
+            }
+        });
+
         // 添加窗口大小调整监听
         window.addEventListener('resize', () => {
             if (this.graph) {
                 const width = this.container.offsetWidth;
                 const height = this.container.offsetHeight;
                 this.graph.changeSize(width, height);
-                this.graph.fitView();
+                this.graph.fitCenter();
             }
         });
     }
 
-    showLoading() {
-        if (this.loading) {
-            this.loading.style.display = 'block';
-        }
-        if (this.generateBtn) {
-            this.generateBtn.disabled = true;
-        }
+    // 显示右键菜单
+    showContextMenu(e, node) {
+        const { x, y } = this.graph.getCanvasByPoint(e.x, e.y);
+        this.contextMenu.style.display = 'block';
+        this.contextMenu.style.left = `${x}px`;
+        this.contextMenu.style.top = `${y}px`;
+        this.selectedNode = node;
     }
 
-    hideLoading() {
-        if (this.loading) {
-            this.loading.style.display = 'none';
-        }
-        if (this.generateBtn) {
-            this.generateBtn.disabled = false;
-        }
+    // 隐藏右键菜单
+    hideContextMenu() {
+        this.contextMenu.style.display = 'none';
+        this.selectedNode = null;
     }
 
-    showError(message) {
-        if (this.errorMessage) {
-            this.errorMessage.textContent = message;
-            this.errorMessage.style.display = 'block';
-            setTimeout(() => {
-                this.errorMessage.style.display = 'none';
-            }, 3000);
-        }
+    // 添加节点
+    addNode() {
+        if (!this.selectedNode) return;
+        
+        const newId = `node-${Date.now()}`;
+        const model = this.graph.findDataById(this.selectedNode);
+        
+        this.graph.addItem('node', {
+            id: newId,
+            label: '新节点',
+            ...this.getNodeConfig(model.depth + 1)
+        });
+
+        this.graph.addItem('edge', {
+            source: this.selectedNode,
+            target: newId,
+            style: {
+                stroke: this.themes[this.currentTheme].node.default.stroke,
+                opacity: 0.8
+            }
+        });
+
+        this.hideContextMenu();
+        this.graph.layout();
     }
 
-    async handleGenerateClick() {
-        const content = this.textInput.value;
-        if (!content) {
-            this.showError('请输入内容');
-            return;
-        }
-
-        this.showLoading();
-        try {
-            const data = await this.processContent(content);
-            await this.renderGraph(data);
-        } catch (error) {
-            console.error('生成思维导图时出错:', error);
-            this.showError(error.message);
-        } finally {
-            this.hideLoading();
-        }
-    }
-
-    async processContent(content) {
-        try {
-            // 构建 prompt
-            const prompt = `请根据以下文本，生成一个结构极其丰富、层次分明的思维导图。要求：
-1. 主题展开要求：
-   - 全面性：覆盖所有重要概念和关键点
-   - 层次性：清晰的主次关系
-   - 关联性：展示概念间的联系
-2. 结构要求：
-   - 主题：核心主题突出
-   - 分支：逻辑分支清晰
-   - 层级：层次结构分明
-
-文本内容：${content}
-
-请返回一个JSON格式的结果，包含以下结构：
-{
-    "topic": "主题名称",
-    "nodes": [
-        {
-            "type": "feature",
-            "label": "一级主题",
-            "children": [
-                {
-                    "type": "point",
-                    "label": "二级要点"
-                }
-            ]
-        }
-    ]
-}`;
-
-            // 调用 API
-            const response = await fetch('https://aigc.sankuai.com/v1/openai/native/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer 1869669620236480523'
-                },
-                body: JSON.stringify({
-                    model: "deepseek-chat",
-                    messages: [
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ],
-                    temperature: 0.7,
-                    max_tokens: 4000,
-                    stream: false
-                })
+    // 编辑节点
+    editNode() {
+        if (!this.selectedNode) return;
+        
+        const node = this.graph.findById(this.selectedNode);
+        const label = prompt('请输入新的文本：', node.getModel().label);
+        
+        if (label !== null) {
+            this.graph.updateItem(this.selectedNode, {
+                label: label
             });
-
-            if (!response.ok) {
-                throw new Error('API 请求失败');
-            }
-
-            const result = await response.json();
-            
-            if (!result.choices || !result.choices[0] || !result.choices[0].message) {
-                throw new Error('API 响应格式无效');
-            }
-
-            return this.cleanAndParseJSON(result.choices[0].message.content);
-        } catch (error) {
-            throw new Error('处理内容失败: ' + error.message);
         }
+
+        this.hideContextMenu();
+    }
+
+    // 删除节点
+    deleteNode() {
+        if (!this.selectedNode) return;
+        
+        const node = this.graph.findById(this.selectedNode);
+        if (node) {
+            this.graph.removeItem(this.selectedNode);
+        }
+
+        this.hideContextMenu();
+    }
+
+    // 更改节点颜色
+    changeNodeColor(color) {
+        if (!this.selectedNode) return;
+        
+        this.graph.updateItem(this.selectedNode, {
+            style: {
+                fill: color,
+                stroke: color
+            }
+        });
+
+        this.hideContextMenu();
+    }
+
+    // 切换主题
+    toggleTheme() {
+        const themes = Object.keys(this.themes);
+        const currentIndex = themes.indexOf(this.currentTheme);
+        const nextIndex = (currentIndex + 1) % themes.length;
+        this.currentTheme = themes[nextIndex];
+        
+        this.graph.getNodes().forEach(node => {
+            const model = node.getModel();
+            const config = model.id === 'node-0' ? 
+                this.themes[this.currentTheme].node.root :
+                this.themes[this.currentTheme].node.default;
+            
+            this.graph.updateItem(node, {
+                style: {
+                    ...config
+                }
+            });
+        });
     }
 
     async renderGraph(data) {
@@ -374,110 +415,5 @@ class MindMap {
         }
     }
 
-    cleanAndParseJSON(data) {
-        try {
-            console.log('开始解析 JSON:', data);
-
-            // 如果已经是对象，直接返回
-            if (typeof data === 'object' && data !== null) {
-                console.log('数据已经是对象格式');
-                return data;
-            }
-
-            // 确保是字符串
-            if (typeof data !== 'string') {
-                throw new Error('无效的数据类型');
-            }
-
-            // 移除 Markdown 代码块标记
-            let cleanText = data
-                .replace(/```json\s*/g, '')
-                .replace(/```\s*$/g, '')
-                .replace(/^[\s\n]*```[\w]*\n/g, '')
-                .replace(/\n```[\s\n]*$/g, '')
-                .trim();
-
-            console.log('清理后的文本:', cleanText);
-
-            // 尝试解析 JSON
-            let jsonData;
-            try {
-                jsonData = JSON.parse(cleanText);
-            } catch (parseError) {
-                console.log('初次解析失败，尝试进一步清理...');
-                
-                // 进一步清理文本
-                cleanText = cleanText
-                    .replace(/,(\s*[}\]])/g, '$1')  // 移除多余的逗号
-                    .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')  // 修复属性名
-                    .replace(/:\s*'([^']*)'/g, ':"$1"')  // 将单引号替换为双引号
-                    .replace(/\n/g, ' ')  // 移除换行符
-                    .replace(/\s+/g, ' ')  // 压缩空白
-                    .trim();
-
-                console.log('进一步清理后的文本:', cleanText);
-                jsonData = JSON.parse(cleanText);
-            }
-
-            // 验证和修复数据结构
-            if (!this.isValidMindMapData(jsonData)) {
-                console.log('数据结构无效，尝试修复...');
-                jsonData = this.repairDataStructure(jsonData);
-            }
-
-            console.log('最终解析的数据:', jsonData);
-            return jsonData;
-
-        } catch (error) {
-            console.error('JSON 解析错误:', error);
-            throw new Error('JSON 解析失败: ' + error.message);
-        }
-    }
-
-    isValidMindMapData(data) {
-        return data && 
-               (data.topic || data.label) && 
-               (Array.isArray(data.nodes) || Array.isArray(data.children));
-    }
-
-    repairDataStructure(data) {
-        // 如果是字符串，创建简单结构
-        if (typeof data === 'string') {
-            return {
-                topic: '思维导图',
-                nodes: [{ label: data }]
-            };
-        }
-
-        // 如果是数组，包装成正确的结构
-        if (Array.isArray(data)) {
-            return {
-                topic: '思维导图',
-                nodes: data.map(item => ({
-                    label: typeof item === 'string' ? item : (item.label || item.topic || '节点')
-                }))
-            };
-        }
-
-        // 如果是对象，规范化结构
-        if (typeof data === 'object' && data !== null) {
-            return {
-                topic: data.topic || data.label || '思维导图',
-                nodes: Array.isArray(data.nodes) ? data.nodes :
-                       Array.isArray(data.children) ? data.children :
-                       [{ label: '节点' }]
-            };
-        }
-
-        // 默认结构
-        return {
-            topic: '思维导图',
-            nodes: [{ label: '节点' }]
-        };
-    }
+    // ... rest of the existing code ...
 }
-
-// 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', () => {
-    new MindMap();
-});
