@@ -51,15 +51,26 @@ class MindMap {
     }
 
     initEventListeners() {
-        // 添加文本输入事件监听
-        this.textInput.addEventListener('input', () => {
+        // 使用箭头函数确保 this 绑定正确
+        const handleInput = () => {
             this.generateBtn.disabled = !this.textInput.value.trim();
-        });
+        };
+
+        const handleGenerate = () => {
+            if (typeof this.handleGenerateClick === 'function') {
+                this.handleGenerateClick();
+            } else {
+                console.error('handleGenerateClick is not a function');
+            }
+        };
+
+        // 添加文本输入事件监听
+        this.textInput.addEventListener('input', handleInput);
 
         // 添加生成按钮事件监听
-        this.generateBtn.addEventListener('click', () => this.handleGenerateClick());
+        this.generateBtn.addEventListener('click', handleGenerate);
 
-        // 添加工具栏事件监听
+        // 添加工具栏事件监听，使用箭头函数
         document.getElementById('addNodeBtn')?.addEventListener('click', () => this.addNode());
         document.getElementById('deleteNodeBtn')?.addEventListener('click', () => this.deleteNode());
         document.getElementById('editNodeBtn')?.addEventListener('click', () => this.editNode());
