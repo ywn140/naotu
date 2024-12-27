@@ -175,7 +175,8 @@ class MindMap {
                         preventOverlap: true,
                         sortByCombo: true,
                         controlPoints: true,
-                        align: 'DL'
+                        align: 'DL',
+                        center: [width / 2, height / 2], // 添加中心点配置
                     },
                     defaultNode: {
                         type: 'rect',
@@ -349,7 +350,13 @@ class MindMap {
                 });
 
                 this.graph.render();
-                this.graph.fitView();
+                // 使用 fitCenter 替代 fitView
+                this.graph.fitCenter();
+                
+                // 添加一个小延迟来确保布局完成后再次居中
+                setTimeout(() => {
+                    this.graph.fitCenter();
+                }, 100);
             }
         } catch (error) {
             console.error('处理图形时出错:', error);
