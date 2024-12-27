@@ -201,6 +201,145 @@ class MindMap {
         });
     }
 
+    async handleGenerateClick() {
+        const content = this.textInput.value.trim();
+        if (!content) {
+            this.showError('请输入内容');
+            return;
+        }
+
+        try {
+            this.showLoading();
+            const response = await fetch('https://aigc.sankuai.com/v1/openai/native/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer 1869669620236480523'
+                },
+                body: JSON.stringify({
+                    model: "deepseek-chat",
+                    messages: [
+                        {
+                            role: "user",
+                            content: `请根据以下文本，生成一个结构极其丰富、层次分明的思维导图。要求：
+1. 主题展开要求：
+   - 全面性：覆盖所有重要概念和关键点
+   - 层次性：清晰的主次关系
+   - 关联性：展示概念间的联系
+2. 结构要求：
+   - 主题：核心主题突出
+   - 分支：逻辑分支清晰
+   - 层级：层次结构分明
+
+文本内容：${content}
+
+请返回一个JSON格式的结果，包含以下结构：
+{
+    "topic": "主题名称",
+    "nodes": [
+        {
+            "type": "feature",
+            "label": "一级主题",
+            "children": [
+                {
+                    "type": "point",
+                    "label": "二级要点"
+                }
+            ]
+        }
+    ]
+}`
+                        }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 4000,
+                    stream: false
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('API 请求失败');
+            }
+
+            const result = await response.json();
+            if (!result.choices || !result.choices[0] || !result.choices[0].message) {
+                throw new Error('API 响应格式无效');
+            }
+
+            const data = this.parseJSON(result.choices[0].message.content);
+            await this.renderGraph(data);
+        } catch (error) {
+            console.error('生成思维导图时出错:', error);
+            this.showError(error.message);
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    showLoading() {
+        if (this.loading) {
+            this.loading.style.display = 'flex';
+        }
+        if (this.generateBtn) {
+            this.generateBtn.disabled = true;
+        }
+    }
+
+    hideLoading() {
+        if (this.loading) {
+            this.loading.style.display = 'none';
+        }
+        if (this.generateBtn) {
+            this.generateBtn.disabled = false;
+        }
+    }
+
+    showError(message) {
+        if (this.errorMessage) {
+            this.errorMessage.textContent = message;
+            this.errorMessage.style.display = 'block';
+            setTimeout(() => {
+                this.errorMessage.style.display = 'none';
+            }, 3000);
+        }
+    }
+
+    parseJSON(content) {
+        try {
+            // 如果已经是对象，直接返回
+            if (typeof content === 'object' && content !== null) {
+                return content;
+            }
+
+            // 清理文本
+            let cleanText = content
+                .replace(/```json\s*/g, '')
+                .replace(/```\s*$/g, '')
+                .replace(/^[\s\n]*```[\w]*\n/g, '')
+                .replace(/\n```[\s\n]*$/g, '')
+                .trim();
+
+            // 尝试解析 JSON
+            try {
+                return JSON.parse(cleanText);
+            } catch (parseError) {
+                // 进一步清理文本
+                cleanText = cleanText
+                    .replace(/,(\s*[}\]])/g, '$1')  // 移除多余的逗号
+                    .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')  // 修复属性名
+                    .replace(/:\s*'([^']*)'/g, ':"$1"')  // 将单引号替换为双引号
+                    .replace(/\n/g, ' ')  // 移除换行符
+                    .replace(/\s+/g, ' ')  // 压缩空白
+                    .trim();
+
+                return JSON.parse(cleanText);
+            }
+        } catch (error) {
+            console.error('JSON 解析错误:', error);
+            throw new Error('JSON 解析失败: ' + error.message);
+        }
+    }
+
     async renderGraph(data) {
         try {
             console.log('开始渲染图形，输入数据:', data);
