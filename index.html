@@ -140,6 +140,10 @@
             font-size: 1.2rem;
         }
         
+        .mindmap-container {
+            position: relative;
+        }
+
         #mindmap {
             width: 100%;
             height: 600px;
@@ -422,7 +426,8 @@
             </div>
         </div>
 
-        <div id="mindmap">
+        <div class="mindmap-container">
+            <div id="mindmap"></div>
             <div class="mindmap-toolbar">
                 <button class="toolbar-button" data-tooltip="添加子节点" id="addNodeBtn">
                     <i class="ri-add-circle-line"></i>
