@@ -1,12 +1,26 @@
 class MindMap {
     constructor() {
-        this.graph = null;
+        // 在构造函数中初始化属性
+        this.init();
+    }
+
+    init() {
+        // 获取 DOM 元素
         this.container = document.getElementById('mindmap');
         this.loading = document.querySelector('.loading');
         this.errorMessage = document.querySelector('.error-message');
         this.textInput = document.getElementById('textInput');
         this.generateBtn = document.getElementById('generateBtn');
         this.contextMenu = document.getElementById('nodeContextMenu');
+        
+        // 确保所有必要的元素都存在
+        if (!this.textInput || !this.generateBtn || !this.container) {
+            console.error('必要的DOM元素未找到');
+            return;
+        }
+
+        // 初始化其他属性
+        this.graph = null;
         this.selectedNode = null;
         this.currentTheme = 'default';
         this.themes = {
@@ -32,21 +46,18 @@ class MindMap {
                 }
             }
         };
-        this.init();
+
+        this.initEventListeners();
     }
 
-    init() {
-        if (this.generateBtn) {
-            this.generateBtn.addEventListener('click', () => this.handleGenerateClick());
-        }
+    initEventListeners() {
+        // 添加文本输入事件监听
+        this.textInput.addEventListener('input', () => {
+            this.generateBtn.disabled = !this.textInput.value.trim();
+        });
 
-        if (this.textInput) {
-            this.textInput.addEventListener('input', () => {
-                if (this.generateBtn) {
-                    this.generateBtn.disabled = !this.textInput.value.trim();
-                }
-            });
-        }
+        // 添加生成按钮事件监听
+        this.generateBtn.addEventListener('click', () => this.handleGenerateClick());
 
         // 添加工具栏事件监听
         document.getElementById('addNodeBtn')?.addEventListener('click', () => this.addNode());
@@ -70,7 +81,7 @@ class MindMap {
 
         // 点击其他地方时隐藏右键菜单
         document.addEventListener('click', (e) => {
-            if (!this.contextMenu.contains(e.target)) {
+            if (this.contextMenu && !this.contextMenu.contains(e.target)) {
                 this.hideContextMenu();
             }
         });
@@ -417,3 +428,8 @@ class MindMap {
 
     // ... rest of the existing code ...
 }
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', () => {
+    new MindMap();
+});
